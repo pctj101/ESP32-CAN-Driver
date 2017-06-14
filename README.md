@@ -14,17 +14,21 @@ CAN Driver Pack.
 
 # credit 
 
-# CAN Driver by Thomas Bart, 
+# CAN Driver 
+by Thomas Bart, 
+
 http://www.barth-dev.de/
 
 Repo: https://github.com/ThomasBarth/ESP32-CAN-Driver
 
-# CAN Driver Pack ESP-IDF by Rudi Wagner, 
+# CAN Driver Pack ESP-IDF 
+by Rudi Wagner, 
+
 http://esp32.de
 
 Repo: https://github.com/ESP32DE/ESP32-CAN-Driver/tree/Component_CAN_Driver_Pack
 
-# DEMO code for CAN Driver Pack on Olimex EVB REV B
+# DEMO code for CAN Driver Pack 
 
 https://github.com/ESP32DE/ESP32-CAN-Driver/tree/DEMO_CAN
 
