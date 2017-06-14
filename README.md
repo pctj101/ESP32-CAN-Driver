@@ -1,7 +1,5 @@
-# ESP32-CAN-Driver
-CAN driver project for the Espressif ESP32
+# Hello World Example
 
-Download and install the ESP IDF framework from https://github.com/espressif/esp-idf. The CAN project works the same way as the other example projects.
+Starts a FreeRTOS task to print "Hello World"
 
-More Infos here:
-http://www.barth-dev.de/can-driver-esp32/
+See the README.md file in the upper level 'examples' directory for more information about examples.
