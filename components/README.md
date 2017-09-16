@@ -8,6 +8,28 @@
  A basic CAN driver for the Espressif ESP32 by [Thomas Barth](http://barth-dev.de)
  
 version 0.1_third_parts by [rudi ;-)](http://esp32.de)
+
+Change Log from 21 May 2017
+ - update to new DPORT Access
+ - DPORT Access changed
+    Details:
+    https://github.com/espressif/esp-idf/commit/377a1f5ea1ca9152524d54df6a7294620f42173c
+
+ - added RTR support
+    Furetheremore, the complete FIR record is now copied into the 
+    CAN frame type. This boosts performance.
+    
+    Details: 
+    https://github.com/ThomasBarth/ESP32-CAN-Driver/commit/990a69465072a6ea7cf14f43f98fd6c95b8cf3a2
+
+ - extended frames and interrupt types
+    Added support for extended CAN frames and created an enum 
+    for the CAN Interrupts.
+    
+    Details: 
+    https://github.com/ThomasBarth/ESP32-CAN-Driver/commit/b1536a9ed3fe61abdeb1a1eaf4abdba978b2a09f
+
+
 Change Log from 22 March 2017
  
    		- modified for esp-idf
@@ -37,53 +59,8 @@ Change Log from 22 March 2017
  				node id ( CAN identifier )
  					- CONFIG_ESP_CAN_NODE_ITSELF
  				enbable/disable send test frames
- 					- CAN_TEST_SENDING_ENABLED
- 					- CAN_TEST_SENDING_DISABLED 
+ 					- CONFIG_CAN_TEST_SENDING_ENABLED
+ 					- CONFIG_CAN_TEST_SENDING_DISABLED 
 
 
     
-# CAN DEMO Code Example
-
-Starts a CAN demo to receive Standard Frames
-if there is test frame set in Kconfig ( menuconfig ) 
-there is also send a test frame.
-
-Note:
-Olimex EVB Rev B 
-Rx CAN = GPIO 35
-Tx CAN = GPIO  5 
-
-See the README.md file in the components CAN directory for more information about 
-CAN Driver Pack.
-
-# credit 
-
-# CAN Driver 
-by Thomas Bart, 
-
-http://www.barth-dev.de/
-
-Repo: https://github.com/ThomasBarth/ESP32-CAN-Driver
-
-# CAN Driver Pack ESP-IDF 
-by Rudi Wagner, 
-
-http://esp32.de
-
-Repo: https://github.com/ESP32DE/ESP32-CAN-Driver/tree/Component_CAN_Driver_Pack
-
-# DEMO code for CAN Driver Pack 
-
-https://github.com/ESP32DE/ESP32-CAN-Driver/tree/DEMO_CAN
-
-
-
-# look allways first to the origin's
-
-https://github.com/ThomasBarth/ESP32-CAN-Driver
-
-https://github.com/ESP32DE/ESP32-CAN-Driver/tree/Component_CAN_Driver_Pack
-
-https://github.com/ESP32DE/ESP32-CAN-Driver/tree/DEMO_CAN
-
->>>>>>> esp32de/DEMO_CAN
