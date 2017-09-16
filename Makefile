@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := CAN-DEMO
+PROJECT_NAME := candemo
 
 include $(IDF_PATH)/make/project.mk
 

@@ -41,15 +41,15 @@
 #include "can_regdef.h"
 #include "CAN_config.h"
 
-
 static void CAN_read_frame();
 static void CAN_isr(void *arg_p);
 
 
+
 static void CAN_isr(void *arg_p){
 
-	//Interrupt flag buffer
-	__CAN_IRQ_t interrupt;
+    //Interrupt flag buffer
+    __CAN_IRQ_t interrupt;
 
     // Read interrupt status and clear flags
     interrupt = MODULE_CAN->IR.U;
@@ -71,7 +71,10 @@ static void CAN_isr(void *arg_p){
                       | __CAN_IRQ_ARB_LOST				//0x40
                       | __CAN_IRQ_BUS_ERR				//0x80
 	)) != 0) {
-    	/*handler*/
+    	/* call error callback handler*/
+	if(CAN_cfg.error_cb != NULL) {
+	    CAN_cfg.error_cb((void *)interrupt);
+	}
     }
 }
 
@@ -207,11 +210,23 @@ int CAN_init(){
 
 	//set baud rate prescaler
 	MODULE_CAN->BTR0.B.BRP=(uint8_t)round((((APB_CLK_FREQ * __tq) / 2) - 1)/1000000)-1;
+        // typical: APB_CLK_FREQ = 80mhz
 
     /* Set sampling
      * 1 -> triple; the bus is sampled three times; recommended for low/medium speed buses     (class A and B) where filtering spikes on the bus line is beneficial
      * 0 -> single; the bus is sampled once; recommended for high speed buses (SAE class C)*/
-    MODULE_CAN->BTR1.B.SAM	=0x1;
+    switch(CAN_cfg.speed){
+            case CAN_SPEED_1000KBPS:
+            case CAN_SPEED_800KBPS:
+            case CAN_SPEED_500KBPS:
+                MODULE_CAN->BTR1.B.SAM	=0x0;
+                break;
+            default:
+                MODULE_CAN->BTR1.B.SAM	=0x1;
+                break;
+    }
+
+
 
     //enable all interrupts
     MODULE_CAN->IER.U = 0xff;

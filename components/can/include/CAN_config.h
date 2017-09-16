@@ -33,6 +33,8 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 
+#include "CAN.h"
+
 
 /** \brief CAN Node Bus speed */
 typedef enum  {
@@ -44,15 +46,18 @@ typedef enum  {
 	CAN_SPEED_1000KBPS=1000				/**< \brief CAN Node runs at 1000kBit/s. */
 }CAN_speed_t;
 
+typedef void (*can_error_cb_t)(void *interrupt_flags_p);
+
+
 /** \brief CAN configuration structure */
 typedef struct  {
-	CAN_speed_t			speed;			/**< \brief CAN speed. */
+    CAN_speed_t			speed;			/**< \brief CAN speed. */
     gpio_num_t 			tx_pin_id;		/**< \brief TX pin. */
     gpio_num_t 			rx_pin_id;		/**< \brief RX pin. */
     QueueHandle_t 		rx_queue;		/**< \brief Handler to FreeRTOS RX queue. */
-}CAN_device_t;
+    can_error_cb_t              error_cb;
+} CAN_device_t;
 
-/** \brief CAN configuration reference */
 extern CAN_device_t CAN_cfg;
 
 

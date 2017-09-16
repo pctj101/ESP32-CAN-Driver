@@ -25,10 +25,13 @@
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_event_loop.h"
+#include "esp_log.h"
+
 #include "nvs_flash.h"
 
 #include "CAN.h"
 #include "CAN_config.h"
+#include "can_regdef.h"
 
 /* brief  : rudi
  * content: Set the CAN Speed over Kconfig
@@ -70,6 +73,10 @@
 #define CONFIG_SELECTED_CAN_SPEED CONFIG_CAN_SPEED_USER_KBPS_VAL /* per menuconfig */
 #endif
 
+
+static const char* CAN_TX_TAG = "can_tx";
+
+
 /* brief  : rudi
  * content: config CAN Speed, Tx, Rx Pins taken from Kconfig
  * over menuconfig you can set the cfg
@@ -78,12 +85,16 @@
  * you can change here too by your self
  * how you need this.
 */
+void can_error_callback(void *); // error callback function prototype
 CAN_device_t CAN_cfg = {
 	.speed		= CONFIG_SELECTED_CAN_SPEED,	// CAN Node baudrade
 	.tx_pin_id 	= CONFIG_ESP_CAN_TXD_PIN_NUM,	// CAN TX pin example menuconfig GPIO_NUM_5
 	.rx_pin_id 	= CONFIG_ESP_CAN_RXD_PIN_NUM,	// CAN RX pin example menuconfig GPIO_NUM_35 ( Olimex )
 	.rx_queue	= NULL,							// FreeRTOS queue for RX frames
+	.error_cb	= can_error_callback
 };
+static __CAN_IRQ_t can_interrupt_flags;
+
 
 esp_err_t event_handler(void *ctx, system_event_t *event)
 {
@@ -103,6 +114,7 @@ void task_CAN( void *pvParameters ){
     CAN_init();
     printf("Can Init done - wait now..\n");
     while (1){
+        printf("Wait Rx Message\n");
         //receive next CAN frame from queue
         if(xQueueReceive(CAN_cfg.rx_queue,&__RX_frame, 3*portTICK_PERIOD_MS)==pdTRUE){
 
@@ -122,6 +134,8 @@ void task_CAN( void *pvParameters ){
 
         	//loop back frame
         	// CAN_write_frame(&__RX_frame);
+        } else {
+			printf("No Rx Message\n");
         }
     }
 }
@@ -129,37 +143,112 @@ void task_CAN( void *pvParameters ){
 
 void task_CAN_TX(void* pvParameters) {
 
-   CAN_frame_t __TX_frame;
-   uint32_t counter = 0;
+  CAN_frame_t __TX_frame;
+  uint32_t counter = 0;
 
-      __TX_frame.MsgID = CONFIG_ESP_CAN_NODE_ITSELF;
-      __TX_frame.FIR.B.DLC   =  8;
-      __TX_frame.data.u8[0]  = 'E';
-      __TX_frame.data.u8[1]  = 'S';
-      __TX_frame.data.u8[2]  = 'P';
-      __TX_frame.data.u8[3]  = '-';
-      __TX_frame.data.u8[4]  = 'C';
-      __TX_frame.data.u8[5]  = 'A';
-      __TX_frame.data.u8[6]  = 'N';
-      __TX_frame.data.u8[7]  = counter;
+  __TX_frame.MsgID = CONFIG_ESP_CAN_NODE_ITSELF;
+  __TX_frame.FIR.B.DLC   =  8;
+  __TX_frame.data.u8[0]  = 'E';
+  __TX_frame.data.u8[1]  = 'S';
+  __TX_frame.data.u8[2]  = 'P';
+  __TX_frame.data.u8[3]  = '-';
+  __TX_frame.data.u8[4]  = 'C';
+  __TX_frame.data.u8[5]  = 'A';
+  __TX_frame.data.u8[6]  = 'N';
+  __TX_frame.data.u8[7]  = counter;
 
-while(1) {
-      __TX_frame.data.u8[7] = counter;
-      CAN_write_frame(&__TX_frame);
-      printf("frame send [%3d]\r", counter);
-      fflush(stdout);
-      vTaskDelay( 1000 / portTICK_PERIOD_MS);  // to see ( printf on receiver side ) what happend..
-      counter++;
-      if (counter >= 256) counter = 0;
+  while(1) {
+    __TX_frame.data.u8[7] = counter;
+    CAN_write_frame(&__TX_frame);
+    printf("frame send [%3d]\n", counter);
+    fflush(stdout);
+    vTaskDelay( 1000 / portTICK_PERIOD_MS);  // to see ( printf on receiver side ) what happend..
+    counter++;
+    if (counter >= 256) counter = 0;
+
+    // Log any accumulated errors
+    if (can_interrupt_flags & __CAN_IRQ_ERR) {
+      ESP_LOGE(CAN_TX_TAG, "__CAN_IRQ_ERR");
+    }	
+    if (can_interrupt_flags & __CAN_IRQ_DATA_OVERRUN) {
+      ESP_LOGE(CAN_TX_TAG, "__CAN_IRQ_DATA_OVERRUN");
+    }	
+    if (can_interrupt_flags & __CAN_IRQ_ERR_PASSIVE) {
+      ESP_LOGE(CAN_TX_TAG, "__CAN_IRQ_ERR_PASSIVE");
+    }	
+    if (can_interrupt_flags & __CAN_IRQ_ARB_LOST) {
+      ESP_LOGE(CAN_TX_TAG, "__CAN_IRQ_ARB_LOST");
+    }	
+    if (can_interrupt_flags & __CAN_IRQ_BUS_ERR) {
+      ESP_LOGE(CAN_TX_TAG, "__CAN_IRQ_BUS_ERR");
+    }	
+
+    // Autorecovery Procedure - In "real life" you should have a maximum retry/recovery limit
+    if ( can_interrupt_flags ) {
+      ESP_LOGE(CAN_TX_TAG, "Reset MOD B RM");
+	can_interrupt_flags = 0;
+
+	//disable all interrupts
+	MODULE_CAN->IER.U = 0x00;
+
+	for (int i = 0; i < 100; i++) {
+	    if (MODULE_CAN->MOD.B.RM == 1) {
+	      ESP_LOGE(CAN_TX_TAG, "Reset MOD B RM = 1 - Ready to reset");
+    	      break;
+	    }
+	    MODULE_CAN->MOD.B.RM = 1; // Reset controller
+	    ESP_LOGE(CAN_TX_TAG, "Reset MOD B RM = 0 - Wait to reset");
+	    vTaskDelay( 1000 / portTICK_PERIOD_MS);  // to see ( printf on receiver side ) what happend..
+	}
+
+	//enable all interrupts
+	MODULE_CAN->IER.U = 0xff;
+
+	//set to normal mode
+	MODULE_CAN->OCR.B.OCMODE=__CAN_OC_NOM;
+
+	//clear error counters
+	MODULE_CAN->TXERR.U = 0;
+	MODULE_CAN->RXERR.U = 0;
+	(void)MODULE_CAN->ECC;
+
+	//clear interrupt flags
+	(void)MODULE_CAN->IR.U;
+
+	//Showtime. Release Reset Mode.
+	MODULE_CAN->MOD.B.RM = 0;
+	ESP_LOGE(CAN_TX_TAG, "Showtime.  Release Reset Mode");
+
+
+    }
+
   }
 }
+
+
+
+void can_error_callback(void *interrupt_flags_p) {
+       __CAN_IRQ_t interrupt_flags = (__CAN_IRQ_t) interrupt_flags_p;
+
+      // Handle error interrupts.
+      if ((interrupt_flags & (__CAN_IRQ_ERR                                             //0x4
+                      | __CAN_IRQ_DATA_OVERRUN                  //0x8
+                      | __CAN_IRQ_WAKEUP                                //0x10
+                      | __CAN_IRQ_ERR_PASSIVE                   //0x20
+                      | __CAN_IRQ_ARB_LOST                              //0x40
+                      | __CAN_IRQ_BUS_ERR                               //0x80
+        )) != 0) {
+	    // Accumuate error flags
+	    can_interrupt_flags |= interrupt_flags;
+      } 
+
+}
+
 
 void app_main(void)
 {
 	// wait for all print Infos
 	vTaskDelay( 1000 / portTICK_PERIOD_MS);
-    // Create CAN receive task
-    // xTaskCreate(&task_CAN, "CAN", 2048, NULL, 5, NULL);
 
 	/*brief: rudi
 	* if you have "activate ESPCan"
@@ -180,11 +269,11 @@ void app_main(void)
 	 #endif
 
 	//Create CAN receive task
-      xTaskCreate(&task_CAN, "CAN", 2048, NULL, 5, NULL);
+        xTaskCreate(&task_CAN, "CAN", 2048, NULL, 5, NULL);
 
-    /* check if we have set a test frame to send in Kconfig */
+        /* check if we have set a test frame to send in Kconfig */
 	 #ifdef CONFIG_CAN_TEST_SENDING_ENABLED
-      printf("Test Frame sending is enabled\n");
+          printf("Test Frame sending is enabled\n");
 	  vTaskDelay( 1000 / portTICK_PERIOD_MS);
 	  xTaskCreate(&task_CAN_TX, "task_CAN_TX", 2048, NULL, 5, NULL);
 	 #endif
