@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := candemo
+PROJECT_NAME := can_autorecover
 
 include $(IDF_PATH)/make/project.mk
 
